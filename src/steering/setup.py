@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'servo_driver = steering.servo_driver:main',
+            'servo_sweep = steering.servo_sweep:main',
         ],
     },
 )
