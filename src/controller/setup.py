@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'ds4 = controller.ds4:main',
         ],
     },
 )
