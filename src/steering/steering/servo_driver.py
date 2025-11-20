@@ -20,7 +20,7 @@ class ServoController(Node):
         max_p = self.get_parameter('max_pulse').value
         
         # --- Servo Range ---
-        self.max_angle = 90
+        self.max_angle = 60
         self.min_angle = 0
 
         # --- Hardware Setup ---
