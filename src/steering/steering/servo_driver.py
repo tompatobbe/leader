@@ -12,7 +12,7 @@ class ServoController(Node):
 
         # --- Configuration ---
         # Declare parameters so you can change pins without recompiling
-        self.declare_parameter('gpio_pin', 18)
+        self.declare_parameter('gpio_pin', 12)
         self.declare_parameter('min_pulse', 0.0005) # 0.5ms (standard for many servos)
         self.declare_parameter('max_pulse', 0.0025) # 2.5ms
         
