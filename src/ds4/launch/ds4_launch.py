@@ -12,6 +12,12 @@ def generate_launch_description():
                 'deadzone': 0.05
             }]                  
         ),
-        
+        Node(
+            package='ds4',
+            executable='ds4_print', 
+            name='ds4_print',
+            parameters=[{
+            }]                  
+        ),
         
     ]) 
