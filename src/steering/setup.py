@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'servo_driver = steering.servo_driver:main',
         ],
     },
 )
