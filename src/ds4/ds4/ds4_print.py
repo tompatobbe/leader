@@ -15,7 +15,7 @@ class DS4PrintNode(Node):
             10)
         
         # Publish servo commands
-        self.servo_publisher = self.publisher(
+        self.servo_publisher = self.create_publisher(
             Float32,
             '/servo/angle',
             10)
