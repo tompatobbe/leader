@@ -24,6 +24,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'stick_driver = leader.stick_driver:main',
+            'servo_driver = leader.servo_driver:main',
+            'control = leader.control.launch.py:main',
         ],
     },
 )
