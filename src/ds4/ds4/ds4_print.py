@@ -15,8 +15,7 @@ class DS4PrintNode(Node):
         self.subscription  # prevent unused variable warning
         self.get_logger().info("Waiting for DualShock 4 input...")
 
-        # DS4 Mapping (Standard Bluetooth/USB config on Linux)
-        # Note: Mappings can vary depending on connection (wired vs bluetooth)
+        # DS4 Mapping
         self.buttons_map = {
             0: "Cross", 1: "Circle", 2: "Triangle", 3: "Square",
             4: "L1", 5: "R1", 6: "L2", 7: "R2",
@@ -29,15 +28,13 @@ class DS4PrintNode(Node):
             2: "L2 Analog", 3: "Right Stick L/R",
             4: "Right Stick U/D", 5: "R2 Analog"
         }
-        # Configure which buttons should trigger actions (by index)
-        # Change this set to only enable the buttons you want.
-        self.enabled_buttons = {}  # example: Cross (0) and Circle (1)
+        
+        self.enabled_buttons = {} 
 
-        # Optional: map button indices to handler methods
-        self.button_handlers = {
-        }
+        # Empty dictionary = no buttons enabled
+        self.button_handlers = {}
 
-    # Button handler methods - customize these to perform actions
+    # Button handler methods (currently unused)
     def on_cross(self):
         self.get_logger().info("Cross (0) handler: action executed")
 
@@ -50,26 +47,25 @@ class DS4PrintNode(Node):
     def on_square(self):
         self.get_logger().info("Square (3) handler: action executed")
 
-
-
     def listener_callback(self, msg):
         # Print Button Inputs — only for enabled buttons
         for i, button_val in enumerate(msg.buttons):
             if button_val == 1:
                 if i in self.button_handlers:
-                    # Call the specific handler for this button
                     try:
                         self.button_handlers[i]()
                     except Exception as e:
                         self.get_logger().error(f"Error in handler for button {i}: {e}")
                 elif i in self.enabled_buttons:
-                    # Enabled but no handler defined: log the press
                     button_name = self.buttons_map.get(i, f"Button {i}")
                     self.get_logger().info(f"Pressed: {button_name}")
-                # otherwise: ignore button presses for non-enabled buttons
 
-        # Print Axis Inputs (only if they are moved significantly)
+        # Print Axis Inputs (ONLY LEFT STICK)
         for i, axis_val in enumerate(msg.axes):
+            # Filter: Only allow index 0 (Left L/R) and 1 (Left U/D)
+            if i not in [0, 1]:
+                continue
+
             if abs(axis_val) > 0.1: # Deadzone filter
                 axis_name = self.axes_map.get(i, f"Axis {i}")
                 self.get_logger().info(f"Moving {axis_name}: {axis_val:.2f}")
@@ -88,6 +84,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
-    #cmd_vel
