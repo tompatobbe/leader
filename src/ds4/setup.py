@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ds4_print=ds4.ds4_print:main',
+            'servo_driver=ds4.servo_driver:main',
         ],
     },
 )
