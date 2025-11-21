@@ -36,6 +36,11 @@ class ServoController(Node):
                 pin_factory=factory
             )
             self.get_logger().info(f'Servo initialized on GPIO {self.pin}')
+        
+            # Set servo to middle position on startup
+            middle_angle = (self.min_angle + self.max_angle) / 2
+            self.servo.angle = middle_angle
+            self.get_logger().info(f'Servo set to middle position: {middle_angle:.2f}°')
         except Exception as e:
             self.get_logger().error(f'Failed to init hardware: {e}')
             # Fallback message helpful for debugging
