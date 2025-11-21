@@ -30,40 +30,32 @@ class DS4PrintNode(Node):
         }
         
         self.enabled_buttons = {} 
-
-        # Empty dictionary = no buttons enabled
         self.button_handlers = {}
 
-    # Button handler methods (currently unused)
-    def on_cross(self):
-        self.get_logger().info("Cross (0) handler: action executed")
-
-    def on_circle(self):
-        self.get_logger().info("Circle (1) handler: action executed")
-
-    def on_triangle(self):
-        self.get_logger().info("Triangle (2) handler: action executed")
-
-    def on_square(self):
-        self.get_logger().info("Square (3) handler: action executed")
+    # Button handler methods (unused)
+    def on_cross(self): pass
+    def on_circle(self): pass
+    def on_triangle(self): pass
+    def on_square(self): pass
 
     def listener_callback(self, msg):
-        # Print Button Inputs — only for enabled buttons
+        # Print Button Inputs (Only if enabled)
         for i, button_val in enumerate(msg.buttons):
             if button_val == 1:
                 if i in self.button_handlers:
                     try:
                         self.button_handlers[i]()
                     except Exception as e:
-                        self.get_logger().error(f"Error in handler for button {i}: {e}")
+                        self.get_logger().error(f"Error in handler: {e}")
                 elif i in self.enabled_buttons:
                     button_name = self.buttons_map.get(i, f"Button {i}")
                     self.get_logger().info(f"Pressed: {button_name}")
 
-        # Print Axis Inputs (ONLY LEFT STICK)
+        # Print Axis Inputs (ONLY LEFT STICK LEFT/RIGHT)
         for i, axis_val in enumerate(msg.axes):
-            # Filter: Only allow index 0 (Left L/R) and 1 (Left U/D)
-            if i not in [0, 1]:
+            # Filter: Only allow index 0 (Left Stick L/R)
+            # If it is NOT 0, skip to the next iteration
+            if i != 0:
                 continue
 
             if abs(axis_val) > 0.1: # Deadzone filter
