@@ -57,7 +57,7 @@ class ServoController(Node):
             10)
         
     def listener_callback(self, msg):
-        target_angle = msg.data + self.middle_offset
+        target_angle = msg.data - self.middle_offset
         if self.servo:
             target_angle = max(self.min_angle, min(self.max_angle, target_angle))
             self.servo.angle = target_angle
