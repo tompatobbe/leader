@@ -37,7 +37,7 @@ def generate_launch_description():
         # ]
     )
 
-    node3 = Node(
+    node4 = Node(
         package='ds4',       # Can be the same package as Node 1
         executable='motor_tester',
         name='motor_tester',
