@@ -19,7 +19,6 @@ class ServoController(Node):
         self.pin = self.get_parameter('gpio_pin').value
         min_p = self.get_parameter('min_pulse').value
         max_p = self.get_parameter('max_pulse').value
-        self.middle_offset = self.get_parameter('middle_offset').value
         
         # --- Servo Range ---
         self.max_angle = 60
@@ -58,17 +57,13 @@ class ServoController(Node):
         
     def listener_callback(self, msg):
         # compute servo command preserving current middle offset
-        target_angle = msg.data + self.middle_offset
+        target_angle = msg.data
         if self.servo:
             target_angle = max(self.min_angle, min(self.max_angle, target_angle))
             self.servo.angle = target_angle
             # show relative angle with center as 0 (plus/minus around middle)
-            middle_angle = (self.min_angle + self.max_angle) / 2
-            #displayed = target_angle - middle_angle
-            
-            target_angle = max(self.min_angle, min(self.max_angle, target_angle))
-            self.servo.angle = target_angle
-            self.get_logger().info(f'Moving to (servo): {target_angle:.2f}°  |  relative: {self.middle_offset:+.2f}°')
+            displayed = 0
+            self.get_logger().info(f'Angle: {target_angle:.2f}° | Relative: {displayed:+.2f}°')
 
 
     def cleanup(self):
