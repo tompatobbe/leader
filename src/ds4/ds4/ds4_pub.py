@@ -73,8 +73,8 @@ class JoystickController(Node):
             motor_msg.data = throttle
             self.motor_publisher.publish(motor_msg)
 
-            # Optional: Print status
-            self.get_logger().info(f"R2: {r2_val:.2f} -> Throttle: {throttle:.2f}")
+            # Print status: Shows Steering Angle and Throttle
+            self.get_logger().info(f"Steer: {self.current_angle:.1f}° | Gas (R2): {r2_val:.2f} -> Throttle: {throttle:.2f}")
 
 def main(args=None):
     rclpy.init(args=args)
