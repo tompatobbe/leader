@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Float32
 import pigpio
 import time
 import math
 
 class MotorTester(Node):
     def __init__(self):
-        super().__init__('motor_tester_node')
+        super().__init__('motor_driver_node')
         
         # --- Parameters ---
-        # Change this to the BCM GPIO pin you are using (e.g., Pin 12 is GPIO 18)
         self.declare_parameter('gpio_pin', 18)
         self.pin = self.get_parameter('gpio_pin').get_parameter_value().integer_value
+        
+        # Safety Limit: 0.20 means max power is limited to 20%
+        self.declare_parameter('max_power_limit', 0.20)
+        self.power_limit = self.get_parameter('max_power_limit').get_parameter_value().double_value
 
-        self.get_logger().info(f"Initializing Motor Tester on GPIO {self.pin}")
+        self.get_logger().info(f"Initializing Motor Driver on GPIO {self.pin} with Max Power {self.power_limit*100}%")
 
         # --- Hardware Setup ---
         self.pi = pigpio.pi()
@@ -22,101 +26,46 @@ class MotorTester(Node):
             self.get_logger().error("Could not connect to pigpio daemon! Did you run 'sudo pigpiod'?")
             exit()
 
-        # --- ESC Constants for WP-1040 ---
-        # 50Hz frequency is standard for RC ESCs
-        # 1500us is center (neutral)
-        # 1000us is full reverse
-        # 2000us is full forward
         self.NEUTRAL_PW = 1500
 
-        # SAFETY LIMIT: Only go to 15% power for testing
-        # Full range is +/- 500. 15% is +/- 75.
-        self.POWER_LIMIT = 0.5 
-        
-        self.MAX_FWD_PW = 1500 + int(500 * self.POWER_LIMIT)
-        self.MAX_REV_PW = 1500 - int(500 * self.POWER_LIMIT)
-        
-        # State variables for the test sequence
-        self.test_state = 'ARMING'
-        self.current_pw = self.NEUTRAL_PW
-        self.start_time = self.get_clock().now().nanoseconds / 1e9
-
-        # Create a timer to run the control loop at 10Hz
-        self.timer = self.create_timer(0.1, self.control_loop)
+        # --- Subscriber ---
+        # Listens for a float between -1.0 and 1.0
+        self.subscription = self.create_subscription(
+            Float32,
+            'motor_throttle',
+            self.listener_callback,
+            10)
 
         # Initial Hardware setup
         self.pi.set_mode(self.pin, pigpio.OUTPUT)
-        self.pi.set_servo_pulsewidth(self.pin, 0) # Off initially
+        self.pi.set_servo_pulsewidth(self.pin, self.NEUTRAL_PW) # Initialize at Neutral to Arm ESC
+        
+        # Give it a moment to arm physically
+        time.sleep(2.0)
+        self.get_logger().info("ESC Initialized. Ready for topics.")
 
     def set_speed(self, pulse_width):
         """Safely writes the pulse width to the ESC"""
-        # Clamp values for safety
-        pulse_width = max(self.MAX_REV_PW, min(pulse_width, self.MAX_FWD_PW))
+        # Hard limits for standard ESCs (1000-2000)
+        pulse_width = max(1000, min(pulse_width, 2000))
         self.pi.set_servo_pulsewidth(self.pin, pulse_width)
 
-    def control_loop(self):
-        now = self.get_clock().now().nanoseconds / 1e9
-        elapsed = now - self.start_time
-
-        # --- PHASE 1: ARMING ---
-        # The WP-1040 needs to see Neutral for a few seconds to "Arm" (Stop beeping)
-        if self.test_state == 'ARMING':
-            self.set_speed(self.NEUTRAL_PW)
-            self.get_logger().info(f"Arming ESC (Neutral)... {int(elapsed)}s")
-            
-            if elapsed > 3.0:
-                self.test_state = 'RAMP_UP'
-                self.get_logger().info("Arming Complete. Starting Forward Ramp.")
-
-        # --- PHASE 2: RAMP FORWARD ---
-        elif self.test_state == 'RAMP_UP':
-            # Increment pulse width
-            self.current_pw += 5 # Reduced step size (was 20) for slower acceleration
-            
-            if self.current_pw >= self.MAX_FWD_PW:
-                self.current_pw = self.MAX_FWD_PW
-                self.test_state = 'RAMP_DOWN'
-                self.get_logger().info("Max Forward Reached. Ramping Down.")
-            
-            self.set_speed(self.current_pw)
-            self.get_logger().info(f"Testing Forward: {self.current_pw}us")
-
-        # --- PHASE 3: RAMP DOWN TO NEUTRAL ---
-        elif self.test_state == 'RAMP_DOWN':
-            self.current_pw -= 5 # Reduced step size
-            
-            if self.current_pw <= self.NEUTRAL_PW:
-                self.current_pw = self.NEUTRAL_PW
-                self.test_state = 'PAUSE'
-                self.pause_start = now
-                self.get_logger().info("Neutral Reached. Pausing before Reverse.")
-            
-            self.set_speed(self.current_pw)
-
-        # --- PHASE 4: PAUSE ---
-        elif self.test_state == 'PAUSE':
-            self.set_speed(self.NEUTRAL_PW)
-            if (now - self.pause_start) > 2.0:
-                self.test_state = 'RAMP_REVERSE'
-                self.get_logger().info("Starting Reverse Ramp.")
-
-        # --- PHASE 5: RAMP REVERSE ---
-        elif self.test_state == 'RAMP_REVERSE':
-            self.current_pw -= 5 # Reduced step size
-            
-            if self.current_pw <= self.MAX_REV_PW:
-                self.current_pw = self.MAX_REV_PW
-                self.test_state = 'FINISHED'
-                self.get_logger().info("Max Reverse Reached. Test Complete.")
-            
-            self.set_speed(self.current_pw)
-            self.get_logger().info(f"Testing Reverse: {self.current_pw}us")
-
-        # --- PHASE 6: FINISHED ---
-        elif self.test_state == 'FINISHED':
-            self.set_speed(self.NEUTRAL_PW)
-            self.get_logger().info("Test Cycle Done. Idling.")
-            # Optional: self.destroy_node() to exit
+    def listener_callback(self, msg):
+        # 1. Clamp input to -1.0 to 1.0 for safety
+        input_throttle = max(-1.0, min(msg.data, 1.0))
+        
+        # 2. Apply Power Limit (scaling)
+        # If limit is 0.2, input 1.0 becomes 0.2
+        scaled_throttle = input_throttle * self.power_limit
+        
+        # 3. Convert to Pulse Width
+        # 0.0 -> 1500
+        # 1.0 -> 1500 + 500 = 2000
+        # -1.0 -> 1500 - 500 = 1000
+        target_pw = self.NEUTRAL_PW + (scaled_throttle * 500)
+        
+        self.set_speed(int(target_pw))
+        # self.get_logger().info(f"Input: {input_throttle:.2f} -> PW: {int(target_pw)}")
 
     def cleanup(self):
         """Stop motor on shutdown"""
