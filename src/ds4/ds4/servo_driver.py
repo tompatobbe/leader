@@ -20,6 +20,7 @@ class ServoController(Node):
         min_p = self.get_parameter('min_pulse').value
         max_p = self.get_parameter('max_pulse').value
         
+        
         # --- Servo Range ---
         self.max_angle = 60
         self.min_angle = 0
@@ -57,12 +58,12 @@ class ServoController(Node):
         
     def listener_callback(self, msg):
         # compute servo command preserving current middle offset
-        target_angle = msg.data
+        target_angle = msg.data + self.middle_offset
         if self.servo:
             target_angle = max(self.min_angle, min(self.max_angle, target_angle))
             self.servo.angle = target_angle
             # show relative angle with center as 0 (plus/minus around middle)
-            displayed = 0
+            displayed = self.middle_offset
             self.get_logger().info(f'Angle: {target_angle:.2f}° | Relative: {displayed:+.2f}°')
 
 
