@@ -1,124 +1,134 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
-import RPi.GPIO as GPIO
+import pigpio
+import time
+import math
 
-# --- Configuration ---
-# Pin definitions (BCM numbering)
-IN1 = 17 # Left Motor Direction
-IN2 = 27 # Left Motor Direction
-ENA = 22 # Left Motor PWM
-IN3 = 23 # Right Motor Direction
-IN4 = 24 # Right Motor Direction
-ENB = 25 # Right Motor PWM
-
-class MotorDriverNode(Node):
+class MotorTester(Node):
     def __init__(self):
-        super().__init__('motor_driver_node')
+        super().__init__('motor_tester_node')
         
-        # 1. Hardware Setup
-        self.setup_gpio()
-        
-        # 2. Robot Physical Properties
-        self.wheel_base = 0.20  # Distance between wheels in meters (Adjust this!)
-        self.max_pwm_val = 100  # Duty cycle usually 0-100
-        
-        # 3. Create Subscriber
-        # Subscribes to 'cmd_vel' topic with a queue size of 10
-        self.subscription = self.create_subscription(
-            Twist,
-            'cmd_vel',
-            self.listener_callback,
-            10)
-        
-        self.get_logger().info('Motor Driver Node Started. Ready for cmd_vel.')
+        # --- Parameters ---
+        # Change this to the BCM GPIO pin you are using (e.g., Pin 12 is GPIO 18)
+        self.declare_parameter('gpio_pin', 13)
+        self.pin = self.get_parameter('gpio_pin').get_parameter_value().integer_value
 
-    def setup_gpio(self):
-        """Initialize Raspberry Pi GPIO pins."""
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup([IN1, IN2, ENA, IN3, IN4, ENB], GPIO.OUT)
+        self.get_logger().info(f"Initializing Motor Tester on GPIO {self.pin}")
+
+        # --- Hardware Setup ---
+        self.pi = pigpio.pi()
+        if not self.pi.connected:
+            self.get_logger().error("Could not connect to pigpio daemon! Did you run 'sudo pigpiod'?")
+            exit()
+
+        # --- ESC Constants for WP-1040 ---
+        # 50Hz frequency is standard for RC ESCs
+        # 1500us is center (neutral)
+        # 1000us is full reverse
+        # 2000us is full forward
+        self.NEUTRAL_PW = 1500
+        self.MAX_FWD_PW = 2000
+        self.MAX_REV_PW = 1000
         
-        # Set PWM frequency to 100Hz
-        self.pwm_left = GPIO.PWM(ENA, 100)
-        self.pwm_right = GPIO.PWM(ENB, 100)
-        
-        # Start at 0 speed
-        self.pwm_left.start(0)
-        self.pwm_right.start(0)
+        # State variables for the test sequence
+        self.test_state = 'ARMING'
+        self.current_pw = self.NEUTRAL_PW
+        self.start_time = self.get_clock().now().nanoseconds / 1e9
 
-    def listener_callback(self, msg):
-        """
-        Callback function triggered every time a message arrives on /cmd_vel.
-        msg.linear.x  = Forward/Backward speed (m/s)
-        msg.angular.z = Rotation speed (rad/s)
-        """
-        linear_x = msg.linear.x
-        angular_z = msg.angular.z
+        # Create a timer to run the control loop at 10Hz
+        self.timer = self.create_timer(0.1, self.control_loop)
 
-        # --- Differential Drive Math ---
-        # Calculate speed for left and right wheels
-        left_speed = linear_x - (angular_z * self.wheel_base / 2.0)
-        right_speed = linear_x + (angular_z * self.wheel_base / 2.0)
+        # Initial Hardware setup
+        self.pi.set_mode(self.pin, pigpio.OUTPUT)
+        self.pi.set_servo_pulsewidth(self.pin, 0) # Off initially
 
-        # Convert m/s to PWM duty cycle (0-100)
-        # NOTE: You must tune 'scaling_factor' based on your motor's max speed
-        scaling_factor = 100.0 
-        left_pwm = left_speed * scaling_factor
-        right_pwm = right_speed * scaling_factor
+    def set_speed(self, pulse_width):
+        """Safely writes the pulse width to the ESC"""
+        # Clamp values for safety
+        pulse_width = max(self.MAX_REV_PW, min(pulse_width, self.MAX_FWD_PW))
+        self.pi.set_servo_pulsewidth(self.pin, pulse_width)
 
-        self.set_motor_speeds(left_pwm, right_pwm)
+    def control_loop(self):
+        now = self.get_clock().now().nanoseconds / 1e9
+        elapsed = now - self.start_time
 
-    def set_motor_speeds(self, left_pwm, right_pwm):
-        """Apply power to motors."""
-        
-        # --- Control Left Motor ---
-        # Clamp values between -100 and 100
-        left_pwm = max(min(left_pwm, 100), -100)
-        
-        if left_pwm > 0:
-            GPIO.output(IN1, GPIO.HIGH)
-            GPIO.output(IN2, GPIO.LOW)
-        elif left_pwm < 0:
-            GPIO.output(IN1, GPIO.LOW)
-            GPIO.output(IN2, GPIO.HIGH)
-        else:
-            GPIO.output(IN1, GPIO.LOW)
-            GPIO.output(IN2, GPIO.LOW)
+        # --- PHASE 1: ARMING ---
+        # The WP-1040 needs to see Neutral for a few seconds to "Arm" (Stop beeping)
+        if self.test_state == 'ARMING':
+            self.set_speed(self.NEUTRAL_PW)
+            self.get_logger().info(f"Arming ESC (Neutral)... {int(elapsed)}s")
             
-        self.pwm_left.ChangeDutyCycle(abs(left_pwm))
+            if elapsed > 3.0:
+                self.test_state = 'RAMP_UP'
+                self.get_logger().info("Arming Complete. Starting Forward Ramp.")
 
-        # --- Control Right Motor ---
-        # Clamp values between -100 and 100
-        right_pwm = max(min(right_pwm, 100), -100)
-        
-        if right_pwm > 0:
-            GPIO.output(IN3, GPIO.HIGH)
-            GPIO.output(IN4, GPIO.LOW)
-        elif right_pwm < 0:
-            GPIO.output(IN3, GPIO.LOW)
-            GPIO.output(IN4, GPIO.HIGH)
-        else:
-            GPIO.output(IN3, GPIO.LOW)
-            GPIO.output(IN4, GPIO.LOW)
+        # --- PHASE 2: RAMP FORWARD ---
+        elif self.test_state == 'RAMP_UP':
+            # Increment pulse width
+            self.current_pw += 20 # Step size
+            
+            if self.current_pw >= self.MAX_FWD_PW:
+                self.current_pw = self.MAX_FWD_PW
+                self.test_state = 'RAMP_DOWN'
+                self.get_logger().info("Max Forward Reached. Ramping Down.")
+            
+            self.set_speed(self.current_pw)
+            self.get_logger().info(f"Testing Forward: {self.current_pw}us")
 
-        self.pwm_right.ChangeDutyCycle(abs(right_pwm))
+        # --- PHASE 3: RAMP DOWN TO NEUTRAL ---
+        elif self.test_state == 'RAMP_DOWN':
+            self.current_pw -= 20
+            
+            if self.current_pw <= self.NEUTRAL_PW:
+                self.current_pw = self.NEUTRAL_PW
+                self.test_state = 'PAUSE'
+                self.pause_start = now
+                self.get_logger().info("Neutral Reached. Pausing before Reverse.")
+            
+            self.set_speed(self.current_pw)
 
-    def on_shutdown(self):
-        """Clean up GPIO on shutdown"""
-        self.pwm_left.stop()
-        self.pwm_right.stop()
-        GPIO.cleanup()
+        # --- PHASE 4: PAUSE ---
+        elif self.test_state == 'PAUSE':
+            self.set_speed(self.NEUTRAL_PW)
+            if (now - self.pause_start) > 2.0:
+                self.test_state = 'RAMP_REVERSE'
+                self.get_logger().info("Starting Reverse Ramp.")
+
+        # --- PHASE 5: RAMP REVERSE ---
+        elif self.test_state == 'RAMP_REVERSE':
+            self.current_pw -= 20
+            
+            if self.current_pw <= self.MAX_REV_PW:
+                self.current_pw = self.MAX_REV_PW
+                self.test_state = 'FINISHED'
+                self.get_logger().info("Max Reverse Reached. Test Complete.")
+            
+            self.set_speed(self.current_pw)
+            self.get_logger().info(f"Testing Reverse: {self.current_pw}us")
+
+        # --- PHASE 6: FINISHED ---
+        elif self.test_state == 'FINISHED':
+            self.set_speed(self.NEUTRAL_PW)
+            self.get_logger().info("Test Cycle Done. Idling.")
+            # Optional: self.destroy_node() to exit
+
+    def cleanup(self):
+        """Stop motor on shutdown"""
+        self.get_logger().info("Stopping Motor...")
+        self.pi.set_servo_pulsewidth(self.pin, 0) # 0 kills the signal
+        self.pi.stop()
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MotorDriverNode()
+    node = MotorTester()
     
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.on_shutdown()
+        node.cleanup()
         node.destroy_node()
         rclpy.shutdown()
 
