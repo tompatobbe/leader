@@ -23,7 +23,7 @@ class ServoController(Node):
         
         
         # --- Servo Range ---
-        self.max_angle = 60
+        self.max_angle = 38
         self.min_angle = 0
 
         # --- Hardware Setup ---
