@@ -30,6 +30,7 @@ setup(
             'servo_driver=ds4.servo_driver:main',
             'axis=ds4.axis:main',
             'motor_driver=ds4.motor_driver:main',
+            'ds4_pub=ds4.ds4_pub:main',
         ],
     },
 )

@@ -83,10 +83,10 @@ class DS4PrintNode(Node):
 
         if len(msg.axes) > 5:
             # Print L2 Analog value (axis 2)
-            l2_val = msg.axes[5]
+            R2_val = msg.axes[5]
 
 
-        self.get_logger().info(f"Servo angle: {self.current_angle:.2f}° R2: {l2_val:.2f}")
+        self.get_logger().info(f"Servo angle: {self.current_angle:.2f}° R2: {R2_val:.2f}")
 
 
 
