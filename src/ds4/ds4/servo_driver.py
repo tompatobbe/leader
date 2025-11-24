@@ -72,7 +72,7 @@ class ServoController(Node):
             # --- LOGGING FIX ---
             # Calculate how far we are from the physical center (50 deg)
             physical_center = (self.min_angle + self.max_angle) / 2
-            displayed = target_angle - physical_center
+            displayed = target_angle + physical_center
             
             self.get_logger().info(f'Angle: {target_angle:.2f}° | Relative: {displayed:+.2f}°')
 
