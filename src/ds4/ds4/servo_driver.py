@@ -68,7 +68,7 @@ class ServoController(Node):
             
             target_angle = max(self.min_angle, min(self.max_angle, target_angle))
             self.servo.angle = target_angle
-            self.get_logger().info(f'Moving to (servo): {target_angle:.2f}°  |  relative: {middle_offset:+.2f}°')
+            self.get_logger().info(f'Moving to (servo): {target_angle:.2f}°  |  relative: {self.middle_offset:+.2f}°')
 
 
     def cleanup(self):
