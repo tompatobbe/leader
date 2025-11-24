@@ -29,6 +29,7 @@ setup(
             'ds4_print=ds4.ds4_print:main',
             'servo_driver=ds4.servo_driver:main',
             'axis=ds4.axis:main',
+            'motor_driver=ds4.motor_driver:main',
         ],
     },
 )
