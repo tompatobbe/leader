@@ -31,7 +31,7 @@ class MotorTester(Node):
 
         # SAFETY LIMIT: Only go to 15% power for testing
         # Full range is +/- 500. 15% is +/- 75.
-        self.POWER_LIMIT = 0.15 
+        self.POWER_LIMIT = 0.5 
         
         self.MAX_FWD_PW = 1500 + int(500 * self.POWER_LIMIT)
         self.MAX_REV_PW = 1500 - int(500 * self.POWER_LIMIT)
