@@ -31,6 +31,7 @@ setup(
             'axis=ds4.axis:main',
             'motor_driver=ds4.motor_driver:main',
             'ds4_pub=ds4.ds4_pub:main',
+            'motor_tester=ds4.motor_tester:main',
         ],
     },
 )
