@@ -1,101 +1,102 @@
 #!/usr/bin/env python3
-import rospy
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Range
 import RPi.GPIO as GPIO
 import time
-from sensor_msgs.msg import Range
 
-# --- Configuration ---
-GPIO_TRIGGER = 23
-GPIO_ECHO = 24
-MIN_RANGE = 0.02 # 2cm in meters
-MAX_RANGE = 4.0  # 4m in meters
-FOV = 0.26       # Field of view in radians (approx 15 degrees)
-
-def measure_distance():
-    # Ensure trigger is low
-    GPIO.output(GPIO_TRIGGER, False)
-    time.sleep(0.000002)
-
-    # Send 10us pulse to trigger
-    GPIO.output(GPIO_TRIGGER, True)
-    time.sleep(0.00001)
-    GPIO.output(GPIO_TRIGGER, False)
-
-    start_time = time.time()
-    stop_time = time.time()
-
-    # Save StartTime
-    # This loop waits for the Echo pin to go HIGH
-    while GPIO.input(GPIO_ECHO) == 0:
-        start_time = time.time()
-        # Safety break to prevent infinite loops if sensor fails
-        if start_time - stop_time > 0.1: 
-            return -1
-
-    # Save StopTime
-    # This loop waits for the Echo pin to go LOW
-    while GPIO.input(GPIO_ECHO) == 1:
-        stop_time = time.time()
-        # Safety break
-        if stop_time - start_time > 0.1:
-            return -1
-
-    # Time difference between start and arrival
-    time_elapsed = stop_time - start_time
-
-    # multiply with the sonic speed (34300 cm/s)
-    # and divide by 2, because there and back
-    distance = (time_elapsed * 343) / 2
-
-    return distance
-
-def sonar_publisher():
-    # Initialize the node
-    rospy.init_node('hcsr04_sensor', anonymous=True)
-    
-    # Create publisher
-    # We use the standard 'Range' message type for distance sensors
-    pub = rospy.Publisher('/sonar_dist', Range, queue_size=10)
-    
-    # Set the loop rate (10 Hz is standard for these sensors)
-    rate = rospy.Rate(10) 
-
-    # GPIO Setup
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
-    GPIO.setup(GPIO_ECHO, GPIO.IN)
-
-    try:
-        rospy.loginfo("Ultrasonic Sensor Node Started...")
+class UltrasonicNode(Node):
+    def __init__(self):
+        super().__init__('hcsr04_sensor')
         
-        while not rospy.is_shutdown():
-            dist = measure_distance()
+        # --- Configuration ---
+        self.gpio_trigger = 23
+        self.gpio_echo = 24
+        self.min_range = 0.02
+        self.max_range = 4.0
+        self.fov = 0.26  # Approx 15 degrees
 
-            # Create the message object
+        # --- GPIO Setup ---
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.gpio_trigger, GPIO.OUT)
+        GPIO.setup(self.gpio_echo, GPIO.IN)
+
+        # --- Publisher Setup ---
+        # Topic: /sonar_dist
+        self.publisher_ = self.create_publisher(Range, 'sonar_dist', 10)
+        
+        # --- Timer Setup ---
+        # 10 Hz = 0.1 seconds period
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        
+        self.get_logger().info("Ultrasonic Sensor Node (ROS 2) Started...")
+
+    def measure_distance(self):
+        # Ensure trigger is low
+        GPIO.output(self.gpio_trigger, False)
+        time.sleep(0.000002)
+
+        # Send 10us pulse
+        GPIO.output(self.gpio_trigger, True)
+        time.sleep(0.00001)
+        GPIO.output(self.gpio_trigger, False)
+
+        start_time = time.time()
+        stop_time = time.time()
+
+        # Wait for Echo to go HIGH
+        while GPIO.input(self.gpio_echo) == 0:
+            start_time = time.time()
+            # Safety timeout (0.1s)
+            if start_time - stop_time > 0.1:
+                return -1.0
+
+        # Wait for Echo to go LOW
+        while GPIO.input(self.gpio_echo) == 1:
+            stop_time = time.time()
+            # Safety timeout
+            if stop_time - start_time > 0.1:
+                return -1.0
+
+        # Calculate distance
+        time_elapsed = stop_time - start_time
+        distance = (time_elapsed * 343) / 2
+        return distance
+
+    def timer_callback(self):
+        dist = self.measure_distance()
+
+        if dist > 0:
             msg = Range()
-            msg.header.stamp = rospy.Time.now()
+            # ROS 2 way to get time
+            msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = "ultrasonic_link"
             msg.radiation_type = Range.ULTRASOUND
-            msg.field_of_view = FOV 
-            msg.min_range = MIN_RANGE
-            msg.max_range = MAX_RANGE
+            msg.field_of_view = self.fov
+            msg.min_range = self.min_range
+            msg.max_range = self.max_range
             msg.range = dist
 
-            # Only publish valid readings
-            if dist > 0:
-                pub.publish(msg)
-                rospy.logdebug("Distance: %.2f m" % dist)
-            else:
-                rospy.logwarn("Sensor read timeout")
+            self.publisher_.publish(msg)
+            
+            # I switched this to .info so you can see it in the terminal
+            self.get_logger().info(f'Distance: {dist:.2f} m')
+        else:
+            self.get_logger().warn('Sensor timeout or out of range')
 
-            rate.sleep()
+def main(args=None):
+    rclpy.init(args=args)
+    node = UltrasonicNode()
 
-    except rospy.ROSInterruptException:
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
         pass
     finally:
-        # Clean up GPIO on exit
+        # Crucial to cleanup GPIO so pins don't stay HIGH
         GPIO.cleanup()
-        rospy.loginfo("GPIO Cleaned up.")
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
-    sonar_publisher()
+    main()
