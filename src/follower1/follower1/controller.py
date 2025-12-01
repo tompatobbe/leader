@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
+# CHANGE: Use relative import for files in the same ROS2 package
 from .PID import PID
 
 # --- The ROS2 PID Node ---
@@ -67,6 +68,12 @@ class PIDControllerNode(Node):
 
         # Get Control Output from PID Class
         output = self.pid.update(error)
+
+        # Log the current state, PID constants, and calculated throttle
+        self.get_logger().info(
+            f"Throttle: {output:.3f} | Error: {error:.3f} | "
+            f"Kp: {self.pid.Kp} Ki: {self.pid.Ki} Kd: {self.pid.Kd}"
+        )
 
         # Publish to Motor Driver
         # Note: Your motor driver logic is: net = fwd - rev.
