@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Range
+from std_msgs.msg import Float32 # Added: Needed for communicating with PID controller
 import RPi.GPIO as GPIO
 import time
 
@@ -22,8 +23,12 @@ class UltrasonicNode(Node):
         GPIO.setup(self.gpio_echo, GPIO.IN)
 
         # --- Publisher Setup ---
-        # Topic: /sonar_dist
+        # 1. Existing Range publisher (Good for visualization/debugging)
         self.publisher_ = self.create_publisher(Range, 'sonar_dist', 10)
+
+        # 2. NEW: Publisher for the PID Controller
+        # The PID controller listens to 'state' to know the current value
+        self.pub_controller = self.create_publisher(Float32, 'state', 10)
         
         # --- Timer Setup ---
         # 10 Hz = 0.1 seconds period
@@ -67,19 +72,23 @@ class UltrasonicNode(Node):
         dist = self.measure_distance()
 
         if dist > 0:
-            msg = Range()
-            # ROS 2 way to get time
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.header.frame_id = "ultrasonic_link"
-            msg.radiation_type = Range.ULTRASOUND
-            msg.field_of_view = self.fov
-            msg.min_range = self.min_range
-            msg.max_range = self.max_range
-            msg.range = dist
+            # 1. Publish Range Message (Old way)
+            msg_range = Range()
+            msg_range.header.stamp = self.get_clock().now().to_msg()
+            msg_range.header.frame_id = "ultrasonic_link"
+            msg_range.radiation_type = Range.ULTRASOUND
+            msg_range.field_of_view = self.fov
+            msg_range.min_range = self.min_range
+            msg_range.max_range = self.max_range
+            msg_range.range = dist
+            self.publisher_.publish(msg_range)
 
-            self.publisher_.publish(msg)
+            # 2. Publish Float32 for Controller (New way)
+            msg_pid = Float32()
+            msg_pid.data = float(dist)
+            self.pub_controller.publish(msg_pid)
             
-            # I switched this to .info so you can see it in the terminal
+            # Log to console
             self.get_logger().info(f'Distance: {dist:.2f} m')
         else:
             self.get_logger().warn('Sensor timeout or out of range')
@@ -100,9 +109,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
-    #sudo pigpiod
-    #sudo adduser $USER gpio
-    #sudo chown root:gpio /dev/gpiomem
-    #sudo chmod g+rw /dev/gpiomem
