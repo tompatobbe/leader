@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
-from PID import PID
+from .PID import PID
 
 # --- The ROS2 PID Node ---
 class PIDControllerNode(Node):
