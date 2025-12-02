@@ -49,10 +49,6 @@ class MotorTester(Node):
 
         # Initial Hardware setup
         self.pi.set_mode(self.pin, pigpio.OUTPUT)
-        self.pi.set_servo_pulsewidth(self.pin, 2000)
-        time.sleep(2.0)
-        self.pi.set_servo_pulsewidth(self.pin, 1000)
-        time.sleep(2.0)
         self.pi.set_servo_pulsewidth(self.pin, self.NEUTRAL_PW)
         time.sleep(2.0)
         self.get_logger().info("ESC Initialized. Ready.")
