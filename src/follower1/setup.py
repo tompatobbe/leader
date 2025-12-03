@@ -29,6 +29,7 @@ setup(
             'motor_driver = follower1.motor_driver:main',
             'controller = follower1.controller:main',
             'motor_teleop = follower1.motor_teleop:main',
+            'motor_driver2 = follower2.motor_driver2:main',
         ],
     },
 )
