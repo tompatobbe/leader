@@ -11,7 +11,7 @@ class PIDControllerNode(Node):
         super().__init__('pid_controller_node')
 
         # --- Parameters (Tunable via command line or yaml) ---
-        self.declare_parameter('kp', 1.0)
+        self.declare_parameter('kp', 10.0)
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.0)
         self.declare_parameter('frequency', 20.0) # Hz
