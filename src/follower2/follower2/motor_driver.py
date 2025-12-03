@@ -88,8 +88,13 @@ class MotorTester(Node):
         
         self.set_speed(int(target_pw))
         
-        # Debug logging
-        self.get_logger().info(f"Fwd:{self.current_fwd:.2f} Rev:{self.current_rev:.2f} -> PW:{int(target_pw)}")
+        # --- LOGGING UPDATED HERE ---
+        # Prints incoming net speed (from topics) and outgoing data (pulse width and scaled throttle)
+        self.get_logger().info(
+            f"Incoming Net Speed: {net_input:.2f} | "
+            f"Outgoing Speed (Scaled): {scaled_throttle:.2f} | "
+            f"Pin PW: {int(target_pw)}"
+        )
 
     def set_speed(self, pulse_width):
         pulse_width = max(1000, min(pulse_width, 2000))
@@ -113,8 +118,6 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
 
     # Instructions to install pigpio library and daemon:    
     # sudo apt install pigpio-tools
