@@ -16,7 +16,7 @@ class MotorTester(Node):
         self.declare_parameter('max_power_limit', 0.50) 
         self.power_limit = self.get_parameter('max_power_limit').get_parameter_value().double_value
 
-        self.maxpwm = 1590  # Max pulse width for ESC
+        self.maxpwm = 1650  # Max pulse width for ESC
 
         self.get_logger().info(f"Initializing Motor Driver on GPIO {self.pin}...")
 
