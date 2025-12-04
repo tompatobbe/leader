@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
-# CHANGE: Use relative import for files in the same ROS2 package
+from rcl_interfaces.msg import SetParametersResult
 from .PID import PID
 
 # --- The ROS2 PID Node ---
@@ -15,6 +15,9 @@ class PIDControllerNode(Node):
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.0)
         self.declare_parameter('frequency', 20.0) # Hz
+
+        # --- ENABLE DYNAMIC UPDATES ---
+        self.add_on_set_parameters_callback(self.parameters_callback)
 
         kp = self.get_parameter('kp').value
         ki = self.get_parameter('ki').value
@@ -49,6 +52,21 @@ class PIDControllerNode(Node):
 
         # Timer: Runs the control loop at the specific frequency
         self.timer = self.create_timer(self.dt, self.control_loop)
+
+
+    def parameters_callback(self, params):
+        """Called when user updates params via rqt or CLI"""
+        for param in params:
+            if param.name == 'kp':
+                self.pid.Kp = param.value
+            elif param.name == 'ki':
+                self.pid.Ki = param.value
+            elif param.name == 'kd':
+                self.pid.Kd = param.value
+                
+            self.get_logger().info(f"Updated {param.name} to {param.value}")
+            
+        return SetParametersResult(successful=True)
 
     def setpoint_callback(self, msg):
         """Updates the target value (Set Point)"""
@@ -98,3 +116,8 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+    ## Syntax: ros2 param set <node_name> <param_name> <value>
+
+    # ros2 param set /pid_controller_node kp 2.5
+    # ros2 param set /pid_controller_node ki 0.1
