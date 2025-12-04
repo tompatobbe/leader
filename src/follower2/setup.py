@@ -24,6 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'motor_driver = follower2.motor_driver:main',
+            'motor_teleop = follower2.motor_teleop:main',
         ],
     },
 )
