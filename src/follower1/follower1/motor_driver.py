@@ -16,6 +16,8 @@ class MotorTester(Node):
         self.declare_parameter('max_power_limit', 0.50) 
         self.power_limit = self.get_parameter('max_power_limit').get_parameter_value().double_value
 
+        self.maxpwm = 1590  # Max pulse width for ESC
+
         self.get_logger().info(f"Initializing Motor Driver on GPIO {self.pin}...")
 
         # --- Hardware Setup ---
@@ -90,9 +92,8 @@ class MotorTester(Node):
             f"Outgoing Speed (Scaled): {scaled_throttle:.2f} | "
             f"Pin PW: {int(target_pw)}"
         )
-    maxpwm = 1590
     def set_speed(self, pulse_width):
-        pulse_width = max(1000, min(pulse_width, maxpwm))
+        pulse_width = max(1000, min(pulse_width, self.maxpwm))
         self.pi.set_servo_pulsewidth(self.pin, pulse_width)
 
     def cleanup(self):
