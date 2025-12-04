@@ -90,9 +90,9 @@ class MotorTester(Node):
             f"Outgoing Speed (Scaled): {scaled_throttle:.2f} | "
             f"Pin PW: {int(target_pw)}"
         )
-
+    maxpwm = 1590
     def set_speed(self, pulse_width):
-        pulse_width = max(1000, min(pulse_width, 2000))
+        pulse_width = max(1000, min(pulse_width, maxpwm))
         self.pi.set_servo_pulsewidth(self.pin, pulse_width)
 
     def cleanup(self):
