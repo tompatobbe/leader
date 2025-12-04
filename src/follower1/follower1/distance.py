@@ -24,11 +24,11 @@ class UltrasonicNode(Node):
 
         # --- Publisher Setup ---
         # 1. Existing Range publisher (Good for visualization/debugging)
-        self.publisher_ = self.create_publisher(Range, 'sonar_dist', 10)
+        self.publisher_ = self.create_publisher(Range, 'follower1/sonar_dist', 10)
 
         # 2. NEW: Publisher for the PID Controller
         # The PID controller listens to 'state' to know the current value
-        self.pub_controller = self.create_publisher(Float32, 'state', 10)
+        self.pub_controller = self.create_publisher(Float32, 'follower1/state', 10)
         
         # --- Timer Setup ---
         # 10 Hz = 0.1 seconds period

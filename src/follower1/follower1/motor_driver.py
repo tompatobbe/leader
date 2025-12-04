@@ -37,7 +37,7 @@ class MotorTester(Node):
         # 1. Forward Topic
         self.sub_fwd = self.create_subscription(
             Float32,
-            'motor_throttle',
+            'follower1/motor_throttle',
             self.fwd_callback,
             10)
             

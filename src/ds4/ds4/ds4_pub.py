@@ -18,19 +18,19 @@ class JoystickController(Node):
         # Publisher for Servo (Steering)
         self.servo_publisher = self.create_publisher(
             Float32,
-            '/servo/angle',
+            'leader/servo/angle',
             10)
 
         # Publisher for Forward (R2)
         self.motor_publisher = self.create_publisher(
             Float32,
-            '/motor_throttle',
+            'leader/motor_throttle',
             10)
 
         # --- NEW: Publisher for Reverse (L2) ---
         self.reverse_publisher = self.create_publisher(
             Float32,
-            '/motor_reverse',
+            'leader/motor_reverse',
             10)
         
         self.get_logger().info("Waiting for DualShock 4 (R2=Gas, L2=Reverse)...")

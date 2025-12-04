@@ -37,15 +37,15 @@ class PIDControllerNode(Node):
         # --- Publishers & Subscribers ---
         
         # Publisher: Sends calculated effort to the MotorDriver
-        self.pub_throttle = self.create_publisher(Float32, 'motor_throttle', 10)
+        self.pub_throttle = self.create_publisher(Float32, 'follower1/motor_throttle', 10)
 
         # Subscriber: The Desired Target (e.g., Target Velocity)
         self.sub_setpoint = self.create_subscription(
-            Float32, 'setpoint', self.setpoint_callback, 10)
+            Float32, 'follower1/setpoint', self.setpoint_callback, 10)
 
         # Subscriber: The Actual System State (e.g., Encoder Velocity)
         self.sub_state = self.create_subscription(
-            Float32, 'state', self.state_callback, 10)
+            Float32, 'follower1/state', self.state_callback, 10)
 
         # Timer: Runs the control loop at the specific frequency
         self.timer = self.create_timer(self.dt, self.control_loop)

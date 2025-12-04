@@ -36,14 +36,14 @@ class MotorTester(Node):
         # 1. Forward Topic
         self.sub_fwd = self.create_subscription(
             Float32,
-            'motor_throttle',
+            'leader/motor_throttle',
             self.fwd_callback,
             10)
             
         # 2. Reverse Topic
         self.sub_rev = self.create_subscription(
             Float32,
-            'motor_reverse',
+            'leader/motor_reverse',
             self.rev_callback,
             10)
 
