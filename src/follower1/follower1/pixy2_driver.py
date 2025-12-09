@@ -85,8 +85,7 @@ class Pixy2SpiNode(Node):
 
                 control_val = x / 315 * 60
 
-                error = center_x - x 
-                error = - error  # Invert to match servo direction
+                control_val = 60 - control_val
                 
                 # Gain (Kp): Maps pixel error to angle. 0.3 is a standard starting point.
                 # If X=0 (Far Left), Error=157.5. Val = 157.5*0.3 + 10 = ~57. Servo = 60-57 = 3 deg.
