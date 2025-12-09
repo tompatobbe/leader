@@ -16,6 +16,8 @@ class Pixy2SpiNode(Node):
         self.spi_bus = 0
         self.spi_device = 0
         self.spi = spidev.SpiDev()
+        self.max_turn_pixy = 240
+        self.max_turn_angle = 60
         
         try:
             self.spi.open(self.spi_bus, self.spi_device)
@@ -83,9 +85,9 @@ class Pixy2SpiNode(Node):
                 center_x = 157.5    
                 # Positive error means object is to the left (X < 157.5)
 
-                control_val = x / 315 * 60
+                control_val = x / self.max_turn_pixy * self.max_turn_angle
 
-                control_val = 60 - control_val
+                control_val = self.max_turn_angle - control_val
                 
                 # Gain (Kp): Maps pixel error to angle. 0.3 is a standard starting point.
                 # If X=0 (Far Left), Error=157.5. Val = 157.5*0.3 + 10 = ~57. Servo = 60-57 = 3 deg.
