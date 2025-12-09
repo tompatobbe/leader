@@ -93,4 +93,11 @@ def main(args=None):
     node = Pixy2SpiNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
