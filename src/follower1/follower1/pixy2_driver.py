@@ -29,29 +29,21 @@ class Pixy2SpiNode(Node):
 
     def update(self):
         # 1. Send Request (Ask for Sig 1)
-        # [Sync, Sync, Type=32, Len=2, Sig=1, MaxBlocks=2]
         req = [0xae, 0xc1, 0x20, 0x02, 1, 0x02]
         try:
             self.spi.xfer2(req)
         except OSError:
             return
 
-        # 2. Read a BIG chunk (64 bytes)
-        # This captures the response even if there are garbage bytes at the start
+        # 2. Read a BIG chunk (64 bytes) to capture the response
         response = self.spi.readbytes(64)
         data_bytes = bytearray(response)
 
-        # 3. Find the Sync Word (0xaf 0xc1) in the chunk
-        # We search through the array to find where the packet actually starts
+        # 3. Find the Sync Word (0xaf 0xc1)
         try:
-            # find() returns the index of the sequence, or -1 if not found
             idx = data_bytes.find(b'\xaf\xc1')
             
             if idx != -1:
-                # We found the start! 
-                # The Header is 4 bytes AFTER the sync word (idx + 2)
-                # Header: [Type, Length, CsumL, CsumH]
-                
                 # Safety check: do we have enough bytes left for a header?
                 if idx + 6 > len(data_bytes):
                     return
@@ -59,13 +51,10 @@ class Pixy2SpiNode(Node):
                 pkt_type = data_bytes[idx + 2]
                 payload_len = data_bytes[idx + 3]
                 
-                # Check if it's the right packet type (0x21 = 33 = GetBlocks Response)
+                # Check if it's the right packet (GetBlocks Response = 0x21)
                 if pkt_type == 0x21 and payload_len > 0:
-                    
-                    # The payload starts after the header (6 bytes after sync)
                     payload_start = idx + 6
                     
-                    # Safety check: do we have enough bytes for the payload?
                     if payload_start + payload_len <= len(data_bytes):
                         payload = data_bytes[payload_start : payload_start + payload_len]
                         self.parse_block(payload)
@@ -74,26 +63,30 @@ class Pixy2SpiNode(Node):
             self.get_logger().warn(f"Scan Error: {e}")
 
     def parse_block(self, payload):
-        # We only care about the first block (14 bytes)
-        if len(payload) >= 14:
+        # We need at least 12 bytes for the coordinates (Sig, X, Y, W, H, Angle)
+        if len(payload) >= 12:
             try:
-                # Unpack: Sig(H), X(H), Y(H), Width(H), Height(H), Angle(h)
+                # --- THE FIX IS HERE ---
                 # < = Little Endian
-                data = struct.unpack_from('<HHHHh', payload, offset=0)
+                # H = Unsigned Short (2 bytes)
+                # h = Signed Short (2 bytes)
+                # Format: H(Sig) H(X) H(Y) H(W) H(H) h(Angle) -> 6 items
+                data = struct.unpack_from('<HHHHHh', payload, offset=0)
+                
                 sig, x, y, w, h, angle = data
                 
-                # --- PUBLISH ---
+                # Publish
                 msg = Point()
                 msg.x = float(x)
                 msg.y = float(y)
-                msg.z = float(w) # Width acts as "Distance"
+                msg.z = float(w) # Using Z for Width
                 self.publisher_.publish(msg)
 
-                # --- PRINT (So you can see it!) ---
+                # Print to terminal
                 self.get_logger().info(f"Target Found! X={x}, Y={y}, Width={w}")
                 
-            except struct.error:
-                pass
+            except struct.error as e:
+                self.get_logger().warn(f"Unpack Error: {e}")
 
 def main(args=None):
     rclpy.init(args=args)
