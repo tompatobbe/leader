@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point
+from std_msgs.msg import Float32  # CHANGED: Needs to match ServoController input
 import spidev
 import struct
 
 class Pixy2SpiNode(Node):
     def __init__(self):
         super().__init__('pixy2_driver')
-        self.publisher_ = self.create_publisher(Point, '/pixy/target', 10)
+        
+        # CHANGED: Update topic and type to match the Servo Controller
+        self.publisher_ = self.create_publisher(Float32, 'follower1/servo/angle', 10)
         
         # SPI Setup
         self.spi_bus = 0
@@ -66,24 +68,35 @@ class Pixy2SpiNode(Node):
         # We need at least 12 bytes for the coordinates (Sig, X, Y, W, H, Angle)
         if len(payload) >= 12:
             try:
-                # --- THE FIX IS HERE ---
-                # < = Little Endian
-                # H = Unsigned Short (2 bytes)
-                # h = Signed Short (2 bytes)
                 # Format: H(Sig) H(X) H(Y) H(W) H(H) h(Angle) -> 6 items
                 data = struct.unpack_from('<HHHHHh', payload, offset=0)
                 
                 sig, x, y, w, h, angle = data
                 
+                # --- CALCULATION LOGIC ---
+                # Pixy2 X range is 0 to 315. Center is ~157.
+                # Servo code does: target = 60 - msg.data
+                # We want Center (157) to result in Servo Middle (~50 deg).
+                # 50 = 60 - msg -> msg must be 10 when centered.
+                
+                # Proportional Controller (P-Controller)
+                center_x = 157.5
+                # Positive error means object is to the left (X < 157.5)
+                error = center_x - x 
+                
+                # Gain (Kp): Maps pixel error to angle. 0.3 is a standard starting point.
+                # If X=0 (Far Left), Error=157.5. Val = 157.5*0.3 + 10 = ~57. Servo = 60-57 = 3 deg.
+                # If X=315 (Far Right), Error=-157.5. Val = -157.5*0.3 + 10 = ~-37. Servo = 60-(-37) = 97 deg.
+                kp = 0.3
+                control_val = (error * kp) + 10.0
+
                 # Publish
-                msg = Point()
-                msg.x = float(x)
-                msg.y = float(y)
-                msg.z = float(w) # Using Z for Width
+                msg = Float32()
+                msg.data = float(control_val)
                 self.publisher_.publish(msg)
 
                 # Print to terminal
-                self.get_logger().info(f"Target Found! X={x}, Y={y}, Width={w}")
+                self.get_logger().info(f"Target X={x} | Sending Val={control_val:.2f}")
                 
             except struct.error as e:
                 self.get_logger().warn(f"Unpack Error: {e}")
