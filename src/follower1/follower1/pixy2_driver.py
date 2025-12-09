@@ -80,7 +80,7 @@ class Pixy2SpiNode(Node):
                 # 50 = 60 - msg -> msg must be 10 when centered.
                 
                 # Proportional Controller (P-Controller)
-                center_x = 170
+                center_x = 157.5    
                 # Positive error means object is to the left (X < 157.5)
                 error = center_x - x 
                 error = - error  # Invert to match servo direction
