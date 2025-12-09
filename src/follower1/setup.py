@@ -31,6 +31,7 @@ setup(
             'motor_teleop = follower1.motor_teleop:main',
             'motor_test = follower1.motor_test:main',
             'mpc = follower1.mpc:main',
+            'camera = follower1.camera:main',
         ],
     },
 )
