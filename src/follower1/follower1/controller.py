@@ -89,10 +89,9 @@ class PIDControllerNode(Node):
         output = self.pid.update(error)
 
         # Log the current state, PID constants, and calculated throttle
-        self.get_logger().info(
-            f"Throttle: {output:.3f} | Error: {error:.3f} | "
-            f"Kp: {self.pid.Kp} Ki: {self.pid.Ki} Kd: {self.pid.Kd}"
-        )
+        # self.get_logger().info(
+        #    f"Throttle: {output:.3f} | Error: {error:.3f} | "
+        #    f"Kp: {self.pid.Kp} Ki: {self.pid.Ki} Kd: {self.pid.Kd}")
 
         # Publish to Motor Driver
         # Note: Your motor driver logic is: net = fwd - rev.
