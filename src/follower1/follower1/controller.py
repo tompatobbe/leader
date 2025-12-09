@@ -25,7 +25,7 @@ class PIDControllerNode(Node):
         freq = self.get_parameter('frequency').value
         self.dt = 1.0 / freq
 
-        self.get_logger().info(f"PID Initialized with Kp={kp}, Ki={ki}, Kd={kd}, dt={self.dt}")
+        # self.get_logger().info(f"PID Initialized with Kp={kp}, Ki={ki}, Kd={kd}, dt={self.dt}")
 
         # Initialize PID Class
         # We clamp output between -1.0 and 1.0 because the motor driver 

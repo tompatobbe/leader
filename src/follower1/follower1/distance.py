@@ -34,7 +34,7 @@ class UltrasonicNode(Node):
         # 10 Hz = 0.1 seconds period
         self.timer = self.create_timer(0.1, self.timer_callback)
         
-        self.get_logger().info("Ultrasonic Sensor Node (ROS 2) Started...")
+        # self.get_logger().info("Ultrasonic Sensor Node (ROS 2) Started...")
 
     def measure_distance(self):
         # Ensure trigger is low
