@@ -12,93 +12,92 @@ class Pixy2SpiNode(Node):
         # --- CONFIGURATION ---
         self.spi_bus = 0
         self.spi_device = 0
-        self.target_signature = 1  # Look for Signature 1 by default
+        self.target_signature = 1  # 1 = Sig 1, 255 = All
         
-        # Initialize SPI
         try:
             self.spi = spidev.SpiDev()
             self.spi.open(self.spi_bus, self.spi_device)
-            self.spi.max_speed_hz = 2000000 # 2 MHz is reliable for Pixy2
+            self.spi.max_speed_hz = 2000000 
             self.spi.mode = 0b00
-            self.get_logger().info(f"SPI Connected. Polling for objects...")
+            self.get_logger().info("SPI Connected. Starting Stream...")
         except Exception as e:
-            self.get_logger().error(f"Failed to open SPI: {e}")
+            self.get_logger().error(f"SPI Fail: {e}")
             return
 
-        # Poll at 20Hz (approx every 0.05s)
-        self.timer = self.create_timer(0.05, self.update)
+        # Poll rapidly
+        self.timer = self.create_timer(0.04, self.update)
 
     def update(self):
-        # --- STEP 1: Send Request ---
-        # 0xae, 0xc1 = Sync (no checksum)
-        # 0x20 = Type 32 (getBlocks)
-        # 0x02 = Data Length (2 bytes follow)
-        # 0x01 = Signature 1 (or 255 for all)
-        # 0x02 = Max blocks to return 
-        request = [0xae, 0xc1, 0x20, 0x02, self.target_signature, 0x02]
-        self.spi.xfer2(request)
+        # 1. Send "Get Blocks" Request
+        # [Sync(2), Type(1), Length(1), Sig(1), MaxBlocks(1)]
+        # Note: 0x20 is command "getBlocks", 0x02 is data length
+        req = [0xae, 0xc1, 0x20, 0x02, self.target_signature, 0x02]
+        self.spi.xfer2(req)
 
-        # --- STEP 2: Read Header ---
-        # INCREASED BUFFER: Reading 64 bytes gives us plenty of room 
-        # for the header (6 bytes) + multiple blocks (14 bytes each)
-        # + some padding/latency bytes.
-        response = self.spi.readbytes(64)
+        # 2. SYNC: Read bytes one by one until we find 0xAF 0xC1
+        # (We limit this loop to avoid hanging forever)
+        for _ in range(50):
+            byte = self.spi.readbytes(1)[0]
+            if byte == 0xaf:
+                # Potential sync, check next byte
+                byte2 = self.spi.readbytes(1)[0]
+                if byte2 == 0xc1:
+                    self.process_packet()
+                    return # Done for this cycle
+
+    def process_packet(self):
+        # We found Sync (0xAF 0xC1). Now read the Header (4 bytes)
+        # Header: [Type, Length, ChecksumL, ChecksumH]
+        header = self.spi.readbytes(4)
         
-        # --- STEP 3: Parse Response ---
-        frame_start = -1
-        # Scan for the Pixy2 response sync word: 0xAF, 0xC1
-        for i in range(len(response) - 1):
-            if response[i] == 0xaf and response[i+1] == 0xc1:
-                frame_start = i
-                break
+        packet_type = header[0]
+        payload_len = header[1]
+        checksum = struct.unpack('<H', bytearray(header[2:4]))[0]
         
-        if frame_start == -1:
-            return # No sync found
+        # If no data (len=0), we are done
+        if payload_len == 0:
+            return
 
-        # Decode the Header
-        try:
-            # We need at least 6 bytes from start to have a header
-            if frame_start + 6 > len(response):
-                return 
+        # 3. Read the Payload
+        # We now know EXACTLY how many bytes to read
+        payload = self.spi.readbytes(payload_len)
+        
+        # Validate Packet Type (0x21 is the response to getBlocks)
+        if packet_type == 0x21:
+            self.parse_blocks(payload)
+        else:
+            # If it's not a block response, ignore it
+            pass
 
-            data_type = response[frame_start + 2]
-            length = response[frame_start + 3]
+    def parse_blocks(self, payload):
+        # A block is 14 bytes
+        BLOCK_SIZE = 14
+        num_blocks = len(payload) // BLOCK_SIZE
+        
+        for i in range(num_blocks):
+            start = i * BLOCK_SIZE
+            end = start + BLOCK_SIZE
             
-            # Type 33 (0x21) is the response to getBlocks
-            if data_type == 0x21 and length > 0:
-                payload_idx = frame_start + 6
-                num_blocks = length // 14
-                
-                if num_blocks > 0:
-                    self.parse_blocks(response, payload_idx, num_blocks)
-                    
-        except IndexError:
-            pass 
-
-    def parse_blocks(self, buffer, start_index, count):
-        current_idx = start_index
-        
-        for i in range(count):
-            # --- FIX: SAFETY CHECK ---
-            # Ensure we actually have 14 bytes left in the buffer
-            if current_idx + 14 > len(buffer):
-                # We ran out of data, stop parsing to avoid the Error
-                break
-                
-            block_bytes = bytearray(buffer[current_idx : current_idx+14])
+            # Extract the slice for this block
+            block_data = bytearray(payload[start:end])
             
+            # SAFETY: Ensure we actually have 14 bytes
+            if len(block_data) != BLOCK_SIZE:
+                continue
+
             try:
-                # Format: H(Sig), H(X), H(Y), H(W), H(H), h(Angle), B(Index), B(Age)
-                sig, x, y, w, h, angle, idx, age = struct.unpack('<HHHHhBB', block_bytes)
+                # Bytes:
+                # 0-1: Sig, 2-3: X, 4-5: Y, 6-7: W, 8-9: H
+                # 10-11: Angle, 12: Index, 13: Age
+                sig, x, y, w, h, angle, idx, age = struct.unpack('<HHHHhBB', block_data)
                 
-                # Print clearly to terminal
-                self.get_logger().info(f"Target Detected: X={x}, Y={y} (W={w}, H={h})")
+                # --- VISUALIZATION ---
+                # Print coordinates to terminal
+                self.get_logger().info(f"Object {i+1}: [Sig {sig}] X:{x} Y:{y} (W:{w} H:{h})")
                 
             except struct.error as e:
-                self.get_logger().warn(f"Packet parsing error: {e}")
+                self.get_logger().warn(f"Struct Error: {e} | Data Len: {len(block_data)}")
 
-            current_idx += 14
-            
 def main(args=None):
     rclpy.init(args=args)
     node = Pixy2SpiNode()
