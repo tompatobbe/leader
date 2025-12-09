@@ -37,10 +37,31 @@ def generate_launch_description():
         # ]
     )
 
+    node4 = Node(
+        package='follower1',       # Can be the same package as Node 1
+        executable='pix2_driver',
+        name='pix2_driver',
+        output='screen',
+        # remappings=[                  # (Optional) Remap topics if necessary
+        #     ('/old_topic', '/new_topic')
+        # ]
+    )
+
+    node5 = Node(
+        package='follower1',       # Can be the same package as Node 1
+        executable='servo_driver',
+        name='servo_driver',
+        output='screen',
+        # remappings=[                  # (Optional) Remap topics if necessary
+        #     ('/old_topic', '/new_topic')
+        # ]
+    )
 
     # --- RETURN LAUNCH DESCRIPTION ---
     return LaunchDescription([
         node1,
         node2,
-        node3
+        node3,
+        node4,
+        node5,
     ])
