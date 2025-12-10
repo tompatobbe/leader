@@ -89,7 +89,7 @@ class UltrasonicNode(Node):
             self.pub_controller.publish(msg_pid)
             
             # Log to console
-            # self.get_logger().info(f'Distance: {dist:.2f} m')
+            self.get_logger().info(f'Distance: {dist:.2f} m')
         else:
             self.get_logger().warn('Sensor timeout or out of range')
 
