@@ -10,7 +10,7 @@ class Pixy2SpiNode(Node):
         super().__init__('pixy2_driver')
         
         # CHANGED: Update topic and type to match the Servo Controller
-        self.publisher_ = self.create_publisher(Float32, 'follower1/servo/angle', 10)
+        self.publisher_ = self.create_publisher(Float32, 'follower2/servo/angle', 10)
         
         # SPI Setup
         self.spi_bus = 0

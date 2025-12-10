@@ -192,18 +192,18 @@ class PlatoonMPCNode(Node):
         # --- Subscribers ---
         # 1. Throttle of vehicle in front
         self.sub_leader_u = self.create_subscription(
-            Float64, 'leader/motor_throttle', self.leader_throttle_callback, 10)
+            Float64, 'follower1/motor_throttle', self.leader_throttle_callback, 10)
         
         # 2. Distance to vehicle in front
         self.sub_dist = self.create_subscription(
-            Float64, 'follower1/sonar_dist', self.distance_callback, 10)
+            Float64, 'follower2/sonar_dist', self.distance_callback, 10)
             
         # 3. Own Odometry (Needed for own velocity)
         self.sub_odom = self.create_subscription(
             Odometry, '/ego/odom', self.odom_callback, 10)
 
         # --- Publishers ---
-        self.pub_throttle = self.create_publisher(Float64, 'follower1/motor_throttle', 10)
+        self.pub_throttle = self.create_publisher(Float64, 'follower2/motor_throttle', 10)
 
         # --- Control Loop ---
         self.timer = self.create_timer(self.dt, self.control_loop)
