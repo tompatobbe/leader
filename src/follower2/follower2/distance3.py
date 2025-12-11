@@ -12,12 +12,12 @@ class MultiUltrasonicNode(Node):
         
         # --- Configuration ---
         # 1. Center Sensor (Existing)
-        self.gpio_trig_c = 5
-        self.gpio_echo_c = 6
+        self.gpio_trig_c = 17 #5
+        self.gpio_echo_c = 27 #6
         
         # 2. Left Sensor (NEW - UPDATE THESE PINS)
-        self.gpio_trig_l = 17 
-        self.gpio_echo_l = 27
+        self.gpio_trig_l = 5 #17 
+        self.gpio_echo_l = 6 #27
         
         # 3. Right Sensor (NEW - UPDATE THESE PINS)
         self.gpio_trig_r = 22
